@@ -39,8 +39,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            mkosi \
             zstd \
+            python3-pip \
+            e2fsprogs \
+            parted
+           
+          # Install latest mkosi from PyPI (v23+) for better arm64 support
+          pip3 install --break-system-packages mkosi 2>&1 || pip3 install mkosi
             systemd-container \
             dosfstools \
             e2fsprogs \
