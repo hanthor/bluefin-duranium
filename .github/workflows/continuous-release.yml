@@ -38,14 +38,14 @@ jobs:
             squashfs-tools
 
       - name: Build image
-        working-directory: duranium-bluefin
+        
         run: |
           echo "Building Duranium+Bluefin for continuous release..."
           mkosi -C . build -vv
         timeout-minutes: 120
 
       - name: Compress image
-        working-directory: duranium-bluefin
+        
         run: |
           echo "Compressing image with zstd..."
           for img in mkosi.output/*.raw; do
@@ -68,7 +68,7 @@ jobs:
           echo "date_version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Create checksums
-        working-directory: duranium-bluefin/mkosi.output
+        /mkosi.output
         run: |
           sha256sum *.raw.zst > checksums.sha256
           md5sum *.raw.zst > checksums.md5
@@ -134,8 +134,8 @@ jobs:
         with:
           name: duranium-bluefin-release-${{ steps.version.outputs.version }}
           path: |
-            duranium-bluefin/mkosi.output/*.raw.zst
-            duranium-bluefin/mkosi.output/checksums.*
+            mkosi.output/*.raw.zst
+            mkosi.output/checksums.*
           retention-days: 90
 
       - name: Delete old releases
@@ -153,9 +153,9 @@ jobs:
           tag_name: duranium-bluefin-${{ steps.version.outputs.version }}
           name: Duranium+Bluefin ${{ steps.version.outputs.version }}
           files: |
-            duranium-bluefin/mkosi.output/*.raw.zst
-            duranium-bluefin/mkosi.output/checksums.sha256
-            duranium-bluefin/mkosi.output/checksums.md5
+            mkosi.output/*.raw.zst
+            mkosi.output/checksums.sha256
+            mkosi.output/checksums.md5
           body_path: release_notes.md
           draft: false
           prerelease: false

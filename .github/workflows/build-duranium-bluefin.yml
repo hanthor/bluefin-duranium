@@ -52,20 +52,20 @@ jobs:
         run: mkosi --version
 
       - name: Build summary
-        working-directory: duranium-bluefin
+        
         run: |
           echo "=== Build Configuration ==="
           mkosi -C . summary 2>&1 | head -50
 
       - name: Build image
-        working-directory: duranium-bluefin
+        
         run: |
           echo "Starting Duranium+Bluefin build..."
           mkosi -C . build -vv
         timeout-minutes: 120
 
       - name: Compress image
-        working-directory: duranium-bluefin
+        
         run: |
           echo "Compressing image with zstd..."
           for img in mkosi.output/*.raw; do
@@ -78,7 +78,7 @@ jobs:
           done
 
       - name: Show build output
-        working-directory: duranium-bluefin
+        
         run: |
           ls -lh mkosi.output/
           file mkosi.output/*.raw.zst || true
@@ -97,7 +97,7 @@ jobs:
           echo "git_ref=${GIT_REF}" >> $GITHUB_OUTPUT
           
           # Create metadata file
-          cat > duranium-bluefin/mkosi.output/build-metadata.txt << EOF
+          cat > mkosi.output/build-metadata.txt << EOF
           Build Date: ${BUILD_DATE}
           Build Time: ${BUILD_TIME}
           Git SHA: ${GIT_SHA}
@@ -105,10 +105,10 @@ jobs:
           GitHub Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EOF
           
-          cat duranium-bluefin/mkosi.output/build-metadata.txt
+          cat mkosi.output/build-metadata.txt
 
       - name: Create checksum
-        working-directory: duranium-bluefin/mkosi.output
+        /mkosi.output
         run: |
           sha256sum *.raw.zst > checksums.sha256
           cat checksums.sha256
@@ -117,7 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: duranium-bluefin-${{ steps.metadata.outputs.git_sha }}
-          path: duranium-bluefin/mkosi.output/
+          path: mkosi.output/
           retention-days: 30
           if-no-files-found: warn
 
@@ -127,9 +127,9 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.release_tag }}
           files: |
-            duranium-bluefin/mkosi.output/*.raw.zst
-            duranium-bluefin/mkosi.output/checksums.sha256
-            duranium-bluefin/mkosi.output/build-metadata.txt
+            mkosi.output/*.raw.zst
+            mkosi.output/checksums.sha256
+            mkosi.output/build-metadata.txt
           body: |
             # Duranium+Bluefin Release
             
