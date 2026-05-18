@@ -1,0 +1,154 @@
+name: Continuous Release
+
+on:
+  workflow_run:
+    workflows: ['Build Duranium+Bluefin Image']
+    types: [completed]
+    branches: [main]
+  schedule:
+    # Build weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-and-release:
+    name: Check and Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mkosi zstd systemd-container dosfstools e2fsprogs btrfs-progs xfsprogs squashfs-tools
+
+      - name: Build image
+        working-directory: duranium-bluefin
+        run: |
+          echo "Building Duranium+Bluefin for continuous release..."
+          mkosi -C . build -vv
+        timeout-minutes: 120
+
+      - name: Generate version
+        id: version
+        run: |
+          VERSION=$(date -u +%Y.%m.%d)
+          BUILD_NUM=${{ github.run_number }}
+          FULL_VERSION="${VERSION}-b${BUILD_NUM}"
+          
+          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "date_version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create checksums
+        working-directory: duranium-bluefin/mkosi.output
+        run: |
+          sha256sum *.raw.zst > checksums.sha256
+          md5sum *.raw.zst > checksums.md5
+          cat checksums.sha256
+
+      - name: Create release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          # Duranium+Bluefin ${{ steps.version.outputs.version }}
+          
+          **Automatic nightly build**
+          
+          ## Features
+          - ✅ Duranium immutable OS with atomic updates
+          - ✅ GNOME Shell desktop
+          - ✅ Bluefin packages & tools
+          - ✅ X13s optimized (Qualcomm firmware, boot kargs)
+          - ✅ One universal image for all arm64 devices
+          
+          ## Files
+          - `duranium-bluefin-arm64.raw.zst` - Bootable disk image (~2-4GB compressed)
+          - `checksums.sha256` - SHA256 checksums
+          - `checksums.md5` - MD5 checksums
+          
+          ## Quick Start
+          
+          ### Deploy to any arm64 device:
+          ```bash
+          zstd -d duranium-bluefin-arm64.raw.zst
+          sudo dd if=duranium-bluefin-arm64.raw of=/dev/sdX bs=8M status=progress
+          sync
+          ```
+          
+          ### Boot and enjoy
+          - Insert USB/disk and boot
+          - GNOME will start
+          - Create user account
+          - Ready to use!
+          
+          ## For X13s
+          Optional: Set boot arguments in U-Boot:
+          ```
+          arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas
+          ```
+          
+          ## Documentation
+          - [Quick Start Guide](https://github.com/${{ github.repository }}/blob/main/duranium-bluefin/QUICKSTART.md)
+          - [Build Instructions](https://github.com/${{ github.repository }}/blob/main/duranium-bluefin/BUILD.md)
+          - [X13s Bootability Guide](https://github.com/${{ github.repository }}/blob/main/docs/X13S-LINUX-BOOTABILITY-GUIDE.md)
+          
+          ## Build Info
+          - Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - Build Number: ${{ github.run_number }}
+          - Commit: ${{ github.sha }}
+          - Repository: ${{ github.repository }}
+          EOF
+          
+          cat release_notes.md
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: duranium-bluefin-release-${{ steps.version.outputs.version }}
+          path: |
+            duranium-bluefin/mkosi.output/*.raw.zst
+            duranium-bluefin/mkosi.output/checksums.*
+          retention-days: 90
+
+      - name: Delete old releases
+        uses: dev-drprasad/delete-older-releases@v0.3.0
+        with:
+          keep_latest: 5
+          delete_prerelease: false
+          delete_tags: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: duranium-bluefin-${{ steps.version.outputs.version }}
+          name: Duranium+Bluefin ${{ steps.version.outputs.version }}
+          files: |
+            duranium-bluefin/mkosi.output/*.raw.zst
+            duranium-bluefin/mkosi.output/checksums.sha256
+            duranium-bluefin/mkosi.output/checksums.md5
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Build and release successful: duranium-bluefin-${{ steps.version.outputs.version }}"
+          echo "📦 Available at: https://github.com/${{ github.repository }}/releases/tag/duranium-bluefin-${{ steps.version.outputs.version }}"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Build or release failed"
+          echo "Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

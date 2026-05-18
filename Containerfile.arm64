@@ -1,0 +1,118 @@
+# Build Duranium+Bluefin as container image
+# Base: postmarketOS edge (Alpine Linux)
+# Target: arm64 (aarch64)
+
+FROM alpine:3.20 AS base
+
+LABEL org.opencontainers.image.title="Duranium+Bluefin"
+LABEL org.opencontainers.image.description="postmarketOS Duranium with Bluefin LTS customizations"
+LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.authors="Bluefin/postmarketOS contributors"
+
+# Set Alpine edge repos
+RUN echo "@edge http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
+    echo "@edgecommunity http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
+    echo "@edgetesting http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+
+# 1. Base system packages
+RUN apk update && apk add --no-cache \
+    base \
+    linux-lts \
+    dracut \
+    systemd \
+    e2fsprogs \
+    ca-certificates \
+    dbus \
+    eudev \
+    udev \
+    musl-locales
+
+# 2. Bluefin CLI tool packages
+RUN apk add --no-cache \
+    bash zsh git curl wget jq ripgrep fd fzf neovim helix tmux \
+    python3 python3-pip nodejs npm rustup go \
+    podman podman-compose \
+    htop btop eza zoxide starship
+
+# 3. Desktop environment (GNOME minimal)
+RUN apk add --no-cache \
+    gnome-shell gnome-terminal gnome-control-center \
+    gnome-calculator gnome-clocks gnome-weather gnome-logs \
+    eog totem rhythmbox
+
+# 4. Multimedia & codecs
+RUN apk add --no-cache \
+    libvpx libvorbis libtheora libopus libflac libmp3lame
+
+# 5. System packages
+RUN apk add --no-cache \
+    openssh openssh-client openssh-server \
+    networkmanager chrony logrotate
+
+# 6. X13s firmware & drivers
+RUN apk add --no-cache @edge \
+    linux-firmware-qcom@edge \
+    gpu-firmware-qcom@edge \
+    wcnss-wlan@edge
+
+# 7. Apply system overlays (GNOME defaults, services, etc.)
+COPY system_files/ /
+
+# 8. Create X13s boot policy directories
+RUN mkdir -p /etc/modprobe.d /etc/modules-load.d /etc/dracut.conf.d
+
+# 9. X13s module ordering
+RUN cat > /etc/modules-load.d/x13s-remoteproc.conf << 'MODULES'
+qcom_pd_mapper
+qcom_q6v5_pas
+MODULES
+
+# 10. X13s softdep
+RUN cat > /etc/modprobe.d/x13s-softdep.conf << 'SOFTDEP'
+softdep qcom_q6v5_pas pre: qcom_pd_mapper
+SOFTDEP
+
+# 11. X13s dracut config
+RUN cat > /etc/dracut.conf.d/x13s-initramfs.conf << 'DRACUT'
+add_drivers+=" msm panel_edp nvme phy_qcom_qmp_pcie typec_ucsi ucsi_glink qcom_pd_mapper "
+hostonly_nolvmcore="yes"
+DRACUT
+
+# 12. X13s boot arguments reference
+RUN cat > /etc/x13s-bootargs.reference << 'BOOTARGS'
+arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas
+BOOTARGS
+
+# 13. Rebuild GNOME gschema cache
+RUN if command -v glib-compile-schemas &> /dev/null; then \
+      glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true; \
+    fi
+
+# 14. Enable Bluefin first-boot service
+RUN if [ -f /etc/systemd/system/bluefin-firstboot.service ]; then \
+      mkdir -p /etc/systemd/system/multi-user.target.wants && \
+      ln -sf ../bluefin-firstboot.service /etc/systemd/system/multi-user.target.wants/bluefin-firstboot.service; \
+    fi
+
+# 15. Customize os-release
+RUN cat >> /etc/os-release << 'OSRELEASE'
+
+VARIANT="Bluefin (Duranium)"
+VARIANT_ID="bluefin-duranium"
+PRETTY_NAME="Duranium Bluefin (postmarketOS edge)"
+OSRELEASE
+
+# 16. Create build marker
+RUN mkdir -p /var/lib && echo "duranium-bluefin-$(date -u +%Y%m%d)" > /var/lib/build-info
+
+# 17. Clean package cache
+RUN apk cache clean && rm -rf /var/cache/apk/*
+
+# 18. Set default shell
+RUN sed -i 's|^root:/bin/ash|root:/bin/bash|' /etc/passwd
+
+# Labels for final image
+LABEL org.opencontainers.image.url="https://github.com/ublue-os/bluefin"
+LABEL org.opencontainers.image.source="https://github.com/postmarketOS"
+
+CMD ["/bin/bash"]

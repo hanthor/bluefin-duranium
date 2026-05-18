@@ -1,0 +1,14 @@
+#!/bin/sh
+# Bluefin first-boot setup
+
+# Rebuild gschema cache
+glib-compile-schemas /usr/share/glib-2.0/schemas
+
+# Enable container-related services
+systemctl enable --now podman.socket 2>/dev/null || true
+systemctl enable --now dbus.socket 2>/dev/null || true
+
+# Create /tmp/bluefin-finalized marker
+touch /var/lib/bluefin-finalized
+
+echo "Bluefin image finalization complete"

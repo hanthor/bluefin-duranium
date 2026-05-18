@@ -1,0 +1,172 @@
+name: Build Duranium+Bluefin Image
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'duranium-bluefin/**'
+      - '.github/workflows/build-duranium-bluefin.yml'
+  pull_request:
+    paths:
+      - 'duranium-bluefin/**'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Create release with this tag (optional)'
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/duranium-bluefin
+
+jobs:
+  build:
+    name: Build Duranium+Bluefin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            mkosi \
+            zstd \
+            systemd-container \
+            dosfstools \
+            e2fsprogs \
+            btrfs-progs \
+            xfsprogs \
+            squashfs-tools
+
+      - name: Verify mkosi installation
+        run: mkosi --version
+
+      - name: Build summary
+        working-directory: duranium-bluefin
+        run: |
+          echo "=== Build Configuration ==="
+          mkosi -C . summary 2>&1 | head -50
+
+      - name: Build image
+        working-directory: duranium-bluefin
+        run: |
+          echo "Starting Duranium+Bluefin build..."
+          mkosi -C . build -vv
+        timeout-minutes: 120
+
+      - name: Show build output
+        working-directory: duranium-bluefin
+        run: |
+          ls -lh mkosi.output/
+          file mkosi.output/*.raw.zst || true
+
+      - name: Generate build metadata
+        id: metadata
+        run: |
+          BUILD_DATE=$(date -u +%Y-%m-%d)
+          BUILD_TIME=$(date -u +%H:%M:%S)
+          GIT_SHA=$(git rev-parse --short HEAD)
+          GIT_REF=$(git describe --tags --always)
+          
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+          echo "build_time=${BUILD_TIME}" >> $GITHUB_OUTPUT
+          echo "git_sha=${GIT_SHA}" >> $GITHUB_OUTPUT
+          echo "git_ref=${GIT_REF}" >> $GITHUB_OUTPUT
+          
+          # Create metadata file
+          cat > duranium-bluefin/mkosi.output/build-metadata.txt << EOF
+          Build Date: ${BUILD_DATE}
+          Build Time: ${BUILD_TIME}
+          Git SHA: ${GIT_SHA}
+          Git Ref: ${GIT_REF}
+          GitHub Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          
+          cat duranium-bluefin/mkosi.output/build-metadata.txt
+
+      - name: Create checksum
+        working-directory: duranium-bluefin/mkosi.output
+        run: |
+          sha256sum *.raw.zst > checksums.sha256
+          cat checksums.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: duranium-bluefin-${{ steps.metadata.outputs.git_sha }}
+          path: duranium-bluefin/mkosi.output/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Create release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: |
+            duranium-bluefin/mkosi.output/*.raw.zst
+            duranium-bluefin/mkosi.output/checksums.sha256
+            duranium-bluefin/mkosi.output/build-metadata.txt
+          body: |
+            # Duranium+Bluefin Release
+            
+            Build Date: ${{ steps.metadata.outputs.build_date }}
+            Build Time: ${{ steps.metadata.outputs.build_time }}
+            Git Ref: ${{ steps.metadata.outputs.git_ref }}
+            Git SHA: ${{ steps.metadata.outputs.git_sha }}
+            
+            ## Files
+            - `duranium-bluefin-arm64.raw.zst` - Bootable disk image (compressed)
+            - `checksums.sha256` - SHA256 checksums for verification
+            
+            ## Quick Deploy
+            ```bash
+            zstd -d duranium-bluefin-arm64.raw.zst
+            sudo dd if=duranium-bluefin-arm64.raw of=/dev/sdX bs=8M status=progress
+            ```
+            
+            ## For X13s
+            Optional boot kargs:
+            ```
+            arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas
+            ```
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ **Duranium+Bluefin build successful**\n\n- Build artifact: duranium-bluefin-${{ steps.metadata.outputs.git_sha }}\n- Git SHA: ${{ steps.metadata.outputs.git_sha }}\n- Build URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+            })
+
+      - name: Build failed
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName === 'pull_request') {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `❌ **Duranium+Bluefin build failed**\n\nCheck the [build logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+              })
+            }

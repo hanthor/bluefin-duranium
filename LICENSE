@@ -1,0 +1,52 @@
+License
+
+This project combines software from multiple sources with different licenses:
+
+## Project License
+This project's build configuration, scripts, and documentation are licensed under the MIT License.
+
+## Included Software
+
+The image includes software from:
+
+### postmarketOS
+- License: GPL v3
+- https://postmarketos.org
+
+### Duranium (postmarketOS)
+- License: GPL v3
+- https://wiki.postmarketos.org/wiki/Duranium_(Immutable_postmarketOS)
+
+### GNOME
+- License: GPL v3 (and other OSI licenses)
+- https://www.gnome.org
+
+### Alpine Linux
+- License: Various (GPL, MIT, BSD, Apache, etc.)
+- https://alpinelinux.org
+
+### Bluefin
+- License: Apache 2.0 (for branding/configuration aspects)
+- https://github.com/ublue-os/bluefin
+
+### Other Included Software
+Packages included are subject to their respective licenses as found in Alpine Linux and postmarketOS repositories.
+
+## Respectful Use
+
+- This project is built on the generous work of the postmarketOS, Alpine Linux, and broader open-source communities
+- Please respect the licenses of all included software
+- Modifications and redistributions must comply with the terms of their respective licenses
+- Attribution to original projects is appreciated
+
+---
+
+For complete license details of included packages, run:
+```bash
+apk info --license [package-name]
+```
+
+See also:
+- postmarketOS License: https://wiki.postmarketos.org/wiki/License
+- Alpine Linux: https://alpinelinux.org/license.html
+- GNOME: https://www.gnome.org/gnome-3/

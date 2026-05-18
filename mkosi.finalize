@@ -1,0 +1,58 @@
+#!/bin/sh
+set -e
+
+echo "=== Finalizing Duranium+Bluefin ==="
+
+# 1. Customize os-release
+cat >> /etc/os-release << 'EOF'
+
+VARIANT="Bluefin (Duranium)"
+VARIANT_ID="bluefin-duranium"
+PRETTY_NAME="Duranium+Bluefin (postmarketOS edge)"
+EOF
+
+# 2. Rebuild GNOME gschema cache
+if [ -d /usr/share/glib-2.0/schemas ]; then
+    glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+fi
+
+# 3. Create X13s-ready boot policy (autodetected at runtime)
+mkdir -p /etc/modprobe.d
+mkdir -p /etc/modules-load.d
+mkdir -p /etc/dracut.conf.d
+
+# X13s module ordering (safe for all devices, but critical for X13s)
+cat > /etc/modules-load.d/universal.conf << 'MODULES'
+# Universal module ordering
+# X13s: qcom_pd_mapper must load before qcom_q6v5_pas
+qcom_pd_mapper
+MODULES
+
+# X13s softdep safety
+cat > /etc/modprobe.d/universal-softdep.conf << 'SOFTDEP'
+# Universal softdeps
+# X13s: ensure pd_mapper loads first
+softdep qcom_q6v5_pas pre: qcom_pd_mapper
+SOFTDEP
+
+# 4. Create X13s boot policy reference (optional, can be applied at deployment)
+cat > /etc/x13s-kargs-reference.txt << 'KARGS'
+# X13s Kernel Boot Arguments (if booting on X13s)
+# Apply via bootloader or boot entry:
+#
+# arm64.nopauth                    - Pointer auth disabled (firmware safety)
+# clk_ignore_unused pd_ignore_unused - Keep firmware clocks/power domains
+# efi=noruntime                    - Skip unsafe Qualcomm UEFI services
+# rd.driver.blacklist=qcom_q6v5_pas - Module ordering (load after pd_mapper)
+#
+# Generic command line for X13s:
+# arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas
+KARGS
+
+# 5. Clean package cache
+apk cache clean
+rm -rf /var/cache/apk/*
+
+echo "=== Finalization complete ==="
+echo "Build info: $(date -u +%Y-%m-%d) arm64"
+echo "Image variant: Duranium+Bluefin GNOME"
