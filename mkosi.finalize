@@ -8,7 +8,7 @@ cat >> /etc/os-release << 'EOF'
 
 VARIANT="Bluefin (Duranium)"
 VARIANT_ID="bluefin-duranium"
-PRETTY_NAME="Duranium+Bluefin (postmarketOS edge)"
+PRETTY_NAME="Duranium+Bluefin (Debian Trixie)"
 EOF
 
 # 2. Rebuild GNOME gschema cache
@@ -49,10 +49,11 @@ cat > /etc/x13s-kargs-reference.txt << 'KARGS'
 # arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas
 KARGS
 
-# 5. Clean package cache
-apk cache clean
-rm -rf /var/cache/apk/*
+# 5. Clean package cache (Debian)
+rm -rf /var/cache/apt/*
+apt-get clean
 
 echo "=== Finalization complete ==="
 echo "Build info: $(date -u +%Y-%m-%d) arm64"
 echo "Image variant: Duranium+Bluefin GNOME"
+
