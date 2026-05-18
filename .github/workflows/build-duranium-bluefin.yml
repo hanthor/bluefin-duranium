@@ -39,7 +39,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            python3-pip \
+            mkosi \
             zstd \
             systemd-container \
             dosfstools \
@@ -47,9 +47,6 @@ jobs:
             btrfs-progs \
             xfsprogs \
             squashfs-tools
-          
-          # Install latest mkosi from pip (apt has older v20.2)
-          sudo pip3 install --upgrade mkosi
 
       - name: Verify mkosi installation
         run: mkosi --version
@@ -66,6 +63,19 @@ jobs:
           echo "Starting Duranium+Bluefin build..."
           mkosi -C . build -vv
         timeout-minutes: 120
+
+      - name: Compress image
+        working-directory: duranium-bluefin
+        run: |
+          echo "Compressing image with zstd..."
+          for img in mkosi.output/*.raw; do
+            if [ -f "$img" ]; then
+              echo "Compressing $img..."
+              zstd -19 -f "$img" -o "${img}.zst"
+              rm "$img"
+              ls -lh "${img}.zst"
+            fi
+          done
 
       - name: Show build output
         working-directory: duranium-bluefin
