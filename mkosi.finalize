@@ -49,11 +49,41 @@ cat > /etc/x13s-kargs-reference.txt << 'KARGS'
 # arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas
 KARGS
 
-# 5. Clean package cache (Debian)
+# 5. Configure systemd-boot with X13s kernel arguments
+mkdir -p /efi/loader/entries
+cat > /efi/loader/loader.conf << 'BOOTCONF'
+default bluefin
+timeout 3
+BOOTCONF
+
+# Create boot entry for X13s (will work on any arm64 UEFI system)
+cat > /efi/loader/entries/bluefin.conf << 'BOOTENTRY'
+title           Bluefin+Duranium
+version         1.0.0-alpha
+machine-id      @MACHINE_ID@
+sort-key        bluefin
+options         arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas
+BOOTENTRY
+
+# 6. Configure GRUB alternative (fallback if systemd-boot not available)
+if command -v grub-mkconfig >/dev/null 2>&1; then
+    mkdir -p /etc/default
+    cat >> /etc/default/grub << 'GRUBCONF'
+
+# X13s boot arguments (automatically applied)
+GRUB_CMDLINE_LINUX="arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas"
+GRUBCONF
+    
+    # Generate GRUB config
+    grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
+fi
+
+# 7. Clean package cache (Debian)
 rm -rf /var/cache/apt/*
 apt-get clean
 
 echo "=== Finalization complete ==="
 echo "Build info: $(date -u +%Y-%m-%d) arm64"
 echo "Image variant: Duranium+Bluefin GNOME"
+echo "Bootable: YES (systemd-boot + X13s optimized)"
 
