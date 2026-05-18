@@ -43,10 +43,7 @@ jobs:
             zstd \
             e2fsprogs \
             parted \
-            dosfstools
-            systemd-container \
             dosfstools \
-            e2fsprogs \
             btrfs-progs \
             xfsprogs \
             squashfs-tools
