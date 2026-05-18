@@ -65,20 +65,22 @@ jobs:
         timeout-minutes: 120
 
       - name: Compress image
-        
+         
         run: |
+          mkdir -p mkosi.output
           echo "Compressing image with zstd..."
-          for img in mkosi.output/*.raw; do
+          for img in *.raw; do
             if [ -f "$img" ]; then
               echo "Compressing $img..."
               zstd -19 -f "$img" -o "${img}.zst"
               rm "$img"
               ls -lh "${img}.zst"
+              mv "${img}.zst" mkosi.output/
             fi
           done
 
       - name: Show build output
-        
+         
         run: |
           ls -lh mkosi.output/
           file mkosi.output/*.raw.zst || true
@@ -108,8 +110,8 @@ jobs:
           cat mkosi.output/build-metadata.txt
 
       - name: Create checksum
-        /mkosi.output
         run: |
+          cd mkosi.output
           sha256sum *.raw.zst > checksums.sha256
           cat checksums.sha256
 

@@ -45,15 +45,17 @@ jobs:
         timeout-minutes: 120
 
       - name: Compress image
-        
+         
         run: |
+          mkdir -p mkosi.output
           echo "Compressing image with zstd..."
-          for img in mkosi.output/*.raw; do
+          for img in *.raw; do
             if [ -f "$img" ]; then
               echo "Compressing $img..."
               zstd -19 -f "$img" -o "${img}.zst"
               rm "$img"
               ls -lh "${img}.zst"
+              mv "${img}.zst" mkosi.output/
             fi
           done
 
@@ -63,13 +65,13 @@ jobs:
           VERSION=$(date -u +%Y.%m.%d)
           BUILD_NUM=${{ github.run_number }}
           FULL_VERSION="${VERSION}-b${BUILD_NUM}"
-          
+           
           echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
           echo "date_version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Create checksums
-        /mkosi.output
         run: |
+          cd mkosi.output
           sha256sum *.raw.zst > checksums.sha256
           md5sum *.raw.zst > checksums.md5
           cat checksums.sha256
