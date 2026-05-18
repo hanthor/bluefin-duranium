@@ -27,7 +27,18 @@ jobs:
       - name: Set up environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y mkosi zstd systemd-container dosfstools e2fsprogs btrfs-progs xfsprogs squashfs-tools
+          sudo apt-get install -y \
+            python3-pip \
+            zstd \
+            systemd-container \
+            dosfstools \
+            e2fsprogs \
+            btrfs-progs \
+            xfsprogs \
+            squashfs-tools
+          
+          # Install latest mkosi from pip (apt has older v20.2)
+          sudo pip3 install --upgrade mkosi
 
       - name: Build image
         working-directory: duranium-bluefin
