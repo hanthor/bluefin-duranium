@@ -50,7 +50,7 @@ jobs:
       - name: Build image
         run: |
           echo "Starting Duranium+Bluefin build..."
-          mkosi -C . build -vv
+          sudo mkosi -C . build -vv
         timeout-minutes: 120
 
       - name: Compress image
