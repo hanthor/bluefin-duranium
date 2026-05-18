@@ -39,7 +39,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            mkosi \
+            python3-pip \
+            python3-dev \
             zstd \
             e2fsprogs \
             parted \
@@ -47,6 +48,9 @@ jobs:
             btrfs-progs \
             xfsprogs \
             squashfs-tools
+          
+          # Install newer mkosi from pip (supports postmarketos)
+          sudo pip3 install --upgrade mkosi
 
       - name: Verify mkosi installation
         run: mkosi --version
