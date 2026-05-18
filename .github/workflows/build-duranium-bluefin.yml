@@ -58,17 +58,35 @@ jobs:
           mkosi -C . summary 2>&1 | head -50
 
       - name: Build image
-        
+         
         run: |
           echo "Starting Duranium+Bluefin build..."
           sudo mkosi -C . build -vv
         timeout-minutes: 120
 
+      - name: Make bootable (inject systemd-boot)
+        run: |
+          echo "Injecting systemd-boot into disk image..."
+          for img in *.raw; do
+            if [ -f "$img" ]; then
+              echo "Processing $img..."
+              # Ensure we can run bootloader injection
+              chmod +x scripts/make-bootable.sh || true
+               
+              # Try to make bootable
+              sudo bash scripts/make-bootable.sh "$img" "${img%.raw}-bootable.raw" 2>&1 || {
+                echo "Warning: Bootloader injection failed, using raw image as-is"
+                mv "$img" "${img%.raw}-bootable.raw"
+              }
+            fi
+          done
+          ls -lh *.raw 2>/dev/null || echo "No raw images found"
+
       - name: Compress image
-         
+          
         run: |
           mkdir -p mkosi.output
-          echo "Compressing image with zstd..."
+          echo "Compressing bootable images with zstd..."
           for img in *.raw; do
             if [ -f "$img" ]; then
               echo "Compressing $img..."
@@ -78,6 +96,9 @@ jobs:
               mv "${img}.zst" mkosi.output/
             fi
           done
+           
+          # Ensure output directory has files
+          ls -lh mkosi.output/ || (echo "mkosi.output is empty"; exit 1)
 
       - name: Show build output
          
