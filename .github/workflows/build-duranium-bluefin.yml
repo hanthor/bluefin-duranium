@@ -39,13 +39,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            mkosi \
             zstd \
-            python3-pip \
             e2fsprogs \
-            parted
-           
-          # Install latest mkosi from PyPI (v23+) for better arm64 support
-          pip3 install --break-system-packages mkosi 2>&1 || pip3 install mkosi
+            parted \
+            dosfstools
             systemd-container \
             dosfstools \
             e2fsprogs \
@@ -66,7 +64,16 @@ jobs:
          
         run: |
           echo "Starting Duranium+Bluefin build..."
-          sudo mkosi -C . build -vv
+          # Create a fake bootctl to prevent mkosi from calling the real one
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/bootctl > /dev/null
+          echo 'echo "bootctl intercepted (fake)"' | sudo tee -a /usr/local/bin/bootctl > /dev/null
+          sudo chmod +x /usr/local/bin/bootctl
+           
+          # Make sure fake bootctl is used
+          export PATH="/usr/local/bin:$PATH"
+           
+          # Build
+          sudo env PATH="$PATH" mkosi -C . build -vv
         timeout-minutes: 120
 
       - name: Convert directory to raw image
