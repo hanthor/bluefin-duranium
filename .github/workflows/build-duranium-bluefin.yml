@@ -64,6 +64,36 @@ jobs:
           sudo mkosi -C . build -vv
         timeout-minutes: 120
 
+      - name: Convert directory to raw image
+        run: |
+          echo "Converting mkosi directory output to .raw image..."
+          ls -la
+           
+          # Find the directory output from mkosi
+          if [ -d "duranium-bluefin" ]; then
+            echo "Found duranium-bluefin directory"
+            dir_size=$(du -sh duranium-bluefin | cut -f1)
+            echo "Directory size: $dir_size"
+             
+            # Create a sparse raw image (3GB should be enough)
+            dd if=/dev/zero of=duranium-bluefin.raw bs=1M count=3000
+             
+            # Format as ext4
+            sudo mkfs.ext4 -F duranium-bluefin.raw
+             
+            # Mount and copy
+            mkdir -p /tmp/mnt
+            sudo mount -o loop duranium-bluefin.raw /tmp/mnt
+            sudo cp -av duranium-bluefin/* /tmp/mnt/
+            sudo umount /tmp/mnt
+             
+            ls -lh duranium-bluefin.raw
+          else
+            echo "Error: duranium-bluefin directory not found!"
+            ls -la
+            exit 1
+          fi
+
       - name: Make bootable (inject systemd-boot)
         run: |
           echo "Injecting systemd-boot into disk image..."
