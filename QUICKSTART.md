@@ -1,188 +1,227 @@
-# Duranium+Bluefin Quick Start
+# Bluefin+Duranium Quick Start
 
 ## TL;DR
 
+**Fastest path**: Download pre-built image from releases
+
 ```bash
-# Build (on postmarketOS/Alpine with mkosi)
-cd duranium-bluefin
-mkosi -C . build
+# Download from releases
+wget https://github.com/hanthor/bluefin-duranium/releases/download/v1.0.0-alpha/bluefin-duranium-arm64.raw.zst
 
-# Deploy (to any arm64 device with EFI)
-zstd -d mkosi.output/duranium-bluefin-arm64.raw.zst
-sudo dd if=duranium-bluefin-arm64.raw of=/dev/sdX bs=8M status=progress
+# Decompress
+zstd -d bluefin-duranium-arm64.raw.zst
 
-# Boot and enjoy
+# Write to USB/disk
+sudo dd if=bluefin-duranium-arm64.raw of=/dev/sdX bs=4M status=progress
+
+# Boot and enjoy!
+```
+
+**Or build locally** (requires mkosi + 50GB space):
+
+```bash
+git clone https://github.com/hanthor/bluefin-duranium
+cd bluefin-duranium
+sudo mkosi build
+zstd -19 bluefin-duranium-arm64.raw
+sudo dd if=bluefin-duranium-arm64.raw of=/dev/sdX bs=4M status=progress
 ```
 
 ## One Image. All Devices.
 
 This is a **universal arm64 image**:
-- ✅ Works on X13s (Snapdragon)
-- ✅ Works on generic arm64 systems with EFI
-- ✅ Single `.raw.zst` file, no per-device variants
+- ✅ Works on Lenovo ThinkPad X13s (Snapdragon)
+- ✅ Works on generic arm64 systems with EFI boot
+- ✅ Single `.raw.zst` file for all devices
 
-## What You Get
+## What's Included
 
-- **Duranium**: Immutable OS with atomic updates via `systemd-sysupdate`
-- **GNOME**: Desktop environment
-- **Bluefin Tools**: neovim, ripgrep, git, zsh, starship, tmux, etc.
-- **Dev Environment**: Python, Node.js, Rust, Go, Podman
+- **Base OS**: Debian Trixie (modern, widely supported)
+- **Immutable OS**: Duranium with atomic updates via `systemd-sysupdate`
+- **Desktop**: GNOME Shell with Bluefin defaults
+- **CLI Tools**: neovim, helix, ripgrep, git, zsh, starship, tmux, fzf, etc.
+- **Development**: Python, Node.js, Rust, Go, Podman, containers
+- **Multimedia**: PipeWire, GStreamer, video/audio codecs
 - **X13s Ready**: Qualcomm firmware + optimized boot policy included
 
-## Build Requirements
+## Download Fastest Option ⚡
 
-- **mkosi**: Modern version (24.x+)
-- **50GB free space** for build
-- **postmarketOS/Alpine-like system** (recommended)
-- **Internet connection**
+Pre-built images available at:
+https://github.com/hanthor/bluefin-duranium/releases
 
-## Build Steps
+Just download, decompress, and write to USB.
 
-1. **Prerequisites**:
-   ```bash
-   apk add mkosi zstd
-   ```
+## Build Locally (Advanced)
 
-2. **Clone/download**:
-   ```bash
-   cd /path/to/duranium-bluefin
-   ```
+### Requirements
 
-3. **Build**:
-   ```bash
-   mkosi -C . build
-   # Takes 20-30 minutes depending on network
-   ```
+- Ubuntu 24.04 or Debian Trixie (with mkosi v20.2+)
+- 50GB free disk space (will use ~40GB for build)
+- 4GB RAM minimum (8GB+ recommended)
+- Internet connection
+- sudo access
 
-4. **Output**:
-   ```bash
-   ls -lh mkosi.output/duranium-bluefin-arm64.raw.zst
-   # ~2-4GB compressed
-   ```
+### Install Prerequisites
+
+**Ubuntu/Debian**:
+```bash
+sudo apt update
+sudo apt install mkosi zstd
+```
+
+### Build
+
+```bash
+# Clone repository
+git clone https://github.com/hanthor/bluefin-duranium
+cd bluefin-duranium
+
+# View build plan
+mkosi summary
+
+# Build the image (~20-40 minutes)
+sudo mkosi build
+
+# Compress for smaller downloads
+zstd -19 --long bluefin-duranium-arm64.raw
+# Produces: bluefin-duranium-arm64.raw.zst (~3GB)
+
+# Verify
+ls -lh bluefin-duranium-arm64.raw*
+```
 
 ## Deploy to USB/Disk
 
-### Linux/Unix
-```bash
-# Find target device (BE CAREFUL - this overwrites data!)
-lsblk
-# Decompress
-zstd -d duranium-bluefin-arm64.raw.zst
+### Find Your Device
 
-# Write to device (replace sdX)
-sudo dd if=duranium-bluefin-arm64.raw of=/dev/sdX bs=8M status=progress
-sync
+```bash
+# List all block devices
+lsblk
+
+# OR list with details
+sudo fdisk -l
+```
+
+**⚠️ WARNING**: Double-check the device name! Using wrong device deletes data!
+
+### Write Image
+
+**Linux**:
+```bash
+# Decompress if needed
+zstd -d bluefin-duranium-arm64.raw.zst
+
+# Write to USB (replace sdX with YOUR device!)
+sudo dd if=bluefin-duranium-arm64.raw of=/dev/sdX bs=4M status=progress
+
+# Flush and verify
+sudo sync
+```
+
+**macOS**:
+```bash
+# Unmount first
+diskutil unmountDisk /dev/diskX
+
+# Write
+sudo dd if=bluefin-duranium-arm64.raw of=/dev/rdiskX bs=4M
 
 # Eject
-sudo eject /dev/sdX
+diskutil eject /dev/diskX
 ```
-
-### For X13s Specifically
-
-Same process above, but you can optionally configure boot kargs in U-Boot:
-
-```
-setenv bootargs "arm64.nopauth clk_ignore_unused pd_ignore_unused efi=noruntime rd.driver.blacklist=qcom_q6v5_pas"
-saveenv
-```
-
-(These are already in the image, so this may be optional.)
 
 ## First Boot
 
-1. Insert USB/disk into device
-2. Boot from USB (may need to press boot menu key during startup)
-3. GNOME should appear
-4. Set up user account
-5. Done!
+### X13s
 
-## First Time Setup
+1. Insert USB into X13s
+2. Power on and press **Delete** during startup
+3. Go to **Boot** menu → set USB as first boot device
+4. Press **F10** to save and exit
+5. System boots into GNOME
+6. Default login: `root` (blank password)
 
-### Update system
+### Generic ARM64
+
+1. Insert USB
+2. Boot (may need to press Boot key during startup)
+3. Select USB from boot menu
+4. GNOME appears
+5. Login as `root` (blank password)
+
+### After Login
+
 ```bash
+# Update system (optional)
 sudo systemctl start systemd-sysupdate
 sudo reboot
+
+# Install packages
+sudo apt install package-name
+
+# Verify hardware
+lsmod | head -20
 ```
 
-### Install additional packages
+## System Features
+
+### Immutable Root Filesystem
+
+Root filesystem is read-only. Changes go in `/etc` and `/home`:
+
 ```bash
-sudo apk add [package-name]  # Alpine packages
+# Install packages (persists across updates)
+sudo apt install neovim git htop
+
+# Edit system config
+sudo nano /etc/networkmanager/conf.d/wifi.conf
+
+# User files
+echo "data" > ~/myfile.txt
 ```
 
-### Switch to different UI (experimental)
-Edit `/etc/os-release`:
-```bash
-sudo nano /etc/os-release
-# Change VARIANT_ID=bluefin-duranium to something like phosh, plasma-mobile, console
-```
-
-Then:
-```bash
-sudo systemctl start systemd-sysupdate --verify=false update
-sudo reboot
-```
-
-## Troubleshooting
-
-### Won't boot
-- Check BIOS: ensure EFI boot is enabled
-- Try debug shell: press Space at boot splash
-- Check `/var/log/syslog` after boot for errors
-
-### GNOME won't start
-```bash
-# Check GPU drivers
-lsmod | grep -i gpu
-
-# Check logs
-journalctl -u gnome-shell -n 50
-```
-
-### No network
-```bash
-# Check NetworkManager
-nmcli dev status
-nmcli con show
-```
-
-### For X13s specific issues
-Refer to: `/var/home/james/postmarketos-x13s/docs/X13S-LINUX-BOOTABILITY-GUIDE.md`
-
-## System Updates
-
-Duranium handles updates atomically:
+### Atomic Updates
 
 ```bash
 # Check for updates
 sudo systemctl status systemd-sysupdate
 
-# Start update (will complete on reboot)
+# Install (happens at reboot)
 sudo systemctl start systemd-sysupdate
 sudo reboot
+
+# Automatic rollback if something fails
 ```
 
-Updates are atomic - if something goes wrong, the system rolls back automatically.
+### SSH Access
 
-## Project Files
+SSH server is enabled by default:
 
-- **mkosi.conf** - Main build configuration
-- **mkosi.finalize** - Post-build setup script
-- **system_files/** - GNOME defaults, services, branding
-- **BUILD.md** - Detailed build guide
-- **README.md** - Full project overview
+```bash
+# From another machine
+ssh root@192.168.1.100
+
+# Find your IP
+hostname -I
+```
 
 ## Next Steps
 
-1. ✅ Review this guide
-2. ✅ Check prerequisites (mkosi, space)
-3. ✅ Run `mkosi -C . build`
-4. ✅ Deploy to USB/disk
-5. ✅ Boot and test
-6. 📝 Report any issues or improvements
+- ✅ Download or build image
+- ✅ Write to USB/disk
+- ✅ Boot on your device
+- ✅ Test and customize
+- 📝 Report issues: https://github.com/hanthor/bluefin-duranium/issues
+
+## Need Help?
+
+- **Installation**: See [DEPLOYMENT.md](DEPLOYMENT.md)
+- **Troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- **Building**: See [BUILD.md](BUILD.md)
+- **X13s specific**: See [README.md](README.md) X13s Boot Policy section
 
 ---
 
-**Questions?** Refer to:
-- Duranium wiki: https://wiki.postmarketos.org/wiki/Duranium_(Immutable_postmarketOS)
-- postmarketOS docs: https://wiki.postmarketos.org
-- X13s guide: `/var/home/james/postmarketos-x13s/docs/`
+**First time with Linux on ARM?** Start here:
+- https://www.debian.org/support
+- https://wiki.postmarketos.org/wiki/Duranium_(Immutable_postmarketOS)
